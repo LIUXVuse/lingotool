@@ -769,7 +769,13 @@
       
       // 獲取 API 密鑰函數
       function getApiKey() {
-        // 嘗試從環境變數獲取（適用於 Cloudflare Pages）
+        // 優先使用環境變數中的API密鑰
+        if (typeof OPENROUTER_API_KEY !== 'undefined' && OPENROUTER_API_KEY) {
+          log('使用環境變數中的API密鑰');
+          return OPENROUTER_API_KEY;
+        }
+        
+        // 如果已經有API_KEY，則直接返回
         if (API_KEY) return API_KEY;
         
         // 檢查本地存儲是否有保存的密鑰
