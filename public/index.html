@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>網頁翻譯工具 - 靜態版本</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 40px auto;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #2563eb;
+    }
+    textarea {
+      width: 100%;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      min-height: 100px;
+      margin-bottom: 20px;
+      box-sizing: border-box;
+    }
+    .button-area {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    button {
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .result-area {
+      padding: 15px;
+      background-color: #f8f8f8;
+      border-radius: 4px;
+      border: 1px solid #eee;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>網頁翻譯工具</h1>
+    
+    <label for="inputText">輸入要翻譯的文本:</label>
+    <textarea id="inputText" placeholder="請在這裡輸入要翻譯的文本"></textarea>
+    
+    <div class="button-area">
+      <button onclick="alert('模擬翻譯功能！')">翻譯</button>
+    </div>
+    
+    <div class="result-area">
+      <h3>翻譯結果:</h3>
+      <p id="result">這裡將顯示翻譯結果</p>
+    </div>
+  </div>
+
+  <script>
+    // 簡單測試腳本
+    document.querySelector('button').addEventListener('click', function() {
+      const input = document.getElementById('inputText').value;
+      if (input.trim()) {
+        document.getElementById('result').textContent = '已翻譯: ' + input;
+      } else {
+        document.getElementById('result').textContent = '請先輸入要翻譯的文本';
+      }
+    });
+  </script>
+</body>
+</html> 

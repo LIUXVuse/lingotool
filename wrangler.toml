@@ -1,0 +1,12 @@
+name = "webtranslate"
+compatibility_date = "2024-03-30"
+routes = [
+  { pattern = "/api/*", zone_name = "webtranslate.pages.dev" }
+]
+
+[site]
+bucket = "./dist"
+
+[build]
+command = "npm run build"
+upload.format = "service-worker" 

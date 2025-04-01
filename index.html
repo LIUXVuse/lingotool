@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>網頁翻譯工具</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+        margin: 0;
+        padding: 20px;
+      }
+      .container {
+        max-width: 800px;
+        margin: 40px auto;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        padding: 20px;
+      }
+      h1 {
+        text-align: center;
+        color: #2563eb;
+      }
+      textarea {
+        width: 100%;
+        padding: 8px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+        min-height: 100px;
+        margin-bottom: 20px;
+        box-sizing: border-box;
+      }
+      .button-area {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      button {
+        background-color: #2563eb;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        margin-right: 10px;
+      }
+      .result-area {
+        padding: 15px;
+        background-color: #f8f8f8;
+        border-radius: 4px;
+        border: 1px solid #eee;
+      }
+      .language-selectors {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        align-items: flex-end;
+      }
+      .language-selector {
+        width: 45%;
+      }
+      .language-switcher {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        background-color: #e0f2fe;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        transition: all 0.3s ease;
+      }
+      .language-switcher:hover {
+        background-color: #bae6fd;
+        transform: scale(1.1);
+      }
+      .language-switcher svg {
+        width: 24px;
+        height: 24px;
+        fill: #2563eb;
+      }
+      select {
+        width: 100%;
+        padding: 8px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+        background-color: white;
+        font-size: 14px;
+      }
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: bold;
+      }
+      .loading {
+        display: none;
+        text-align: center;
+        margin: 10px 0;
+      }
+      .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(37, 99, 235, 0.2);
+        border-radius: 50%;
+        border-top-color: #2563eb;
+        animation: spin 1s ease-in-out infinite;
+        margin-right: 10px;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .error-message {
+        color: #e11d48;
+        font-weight: bold;
+        margin-top: 10px;
+        display: none;
+      }
+      .debug-info {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: 4px;
+        font-size: 12px;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      /* 登入區塊樣式 */
+      .auth-container {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+      .user-info {
+        display: none;
+        margin-right: 10px;
+      }
+      .login-buttons {
+        display: flex;
+      }
+      .login-buttons button {
+        margin-left: 5px;
+        padding: 8px 16px;
+        font-size: 14px;
+      }
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.6);
+        z-index: 1000;
+      }
+      .modal-content {
+        background-color: white;
+        margin: 15% auto;
+        padding: 20px;
+        width: 80%;
+        max-width: 400px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      }
+      .modal-close {
+        float: right;
+        cursor: pointer;
+        font-size: 24px;
+        font-weight: bold;
+      }
+      .modal input {
+        width: 100%;
+        padding: 10px;
+        margin: 10px 0;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      .modal button {
+        margin-top: 10px;
+        width: 100%;
+      }
+      /* 片語功能樣式 */
+      .phrases-container {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: #f8f8f8;
+        border-radius: 4px;
+        border: 1px solid #eee;
+        display: none;
+      }
+      .phrases-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .phrases-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+      }
+      .phrase-item {
+        padding: 8px;
+        background-color: #e0f2fe;
+        border-radius: 4px;
+        cursor: pointer;
+        text-align: center;
+        transition: background-color 0.2s;
+      }
+      .phrase-item:hover {
+        background-color: #bae6fd;
+      }
+      .add-phrase-form {
+        margin-top: 10px;
+        display: none;
+      }
+      .add-phrase-form input, .add-phrase-form textarea {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      .add-phrase-form textarea {
+        min-height: 80px;
+      }
+      .add-phrase-buttons {
+        display: flex;
+        justify-content: flex-end;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>網頁翻譯工具</h1>
+      
+      <!-- 用戶認證區塊 -->
+      <div class="auth-container">
+        <div class="user-info" id="userInfo">
+          <span id="userName">未登入</span>
+        </div>
+        <div class="login-buttons" id="loginButtons">
+          <button id="loginBtn" style="background-color: #4f46e5;">登入</button>
+          <button id="logoutBtn" style="background-color: #9ca3af; display: none;">登出</button>
+        </div>
+      </div>
+      
+      <div class="language-selectors">
+        <div class="language-selector">
+          <label for="sourceLanguage">來源語言:</label>
+          <select id="sourceLanguage">
+            <option value="auto">自動檢測</option>
+            <optgroup label="常用語言">
+              <option value="zh-TW" selected>繁體中文</option>
+              <option value="zh-CN">簡體中文</option>
+              <option value="en">英文</option>
+              <option value="ja">日文</option>
+              <option value="ko">韓文</option>
+            </optgroup>
+            <optgroup label="東亞語言">
+              <option value="ja">日文</option>
+              <option value="ko">韓文</option>
+              <option value="mn">蒙古文</option>
+            </optgroup>
+            <optgroup label="東南亞語言">
+              <option value="vi">越南文</option>
+              <option value="th">泰文</option>
+              <option value="id">印尼文</option>
+              <option value="ms">馬來文</option>
+              <option value="fil">菲律賓文</option>
+              <option value="my">緬甸文</option>
+              <option value="km">柬埔寨文</option>
+              <option value="lo">寮國文</option>
+            </optgroup>
+            <optgroup label="南亞語言">
+              <option value="hi">印地文</option>
+              <option value="bn">孟加拉文</option>
+              <option value="ta">泰米爾文</option>
+              <option value="ur">烏爾都文</option>
+              <option value="ne">尼泊爾文</option>
+              <option value="si">僧伽羅文</option>
+            </optgroup>
+            <optgroup label="西歐語言">
+              <option value="en">英文</option>
+              <option value="fr">法文</option>
+              <option value="de">德文</option>
+              <option value="es">西班牙文</option>
+              <option value="it">義大利文</option>
+              <option value="pt">葡萄牙文</option>
+              <option value="nl">荷蘭文</option>
+            </optgroup>
+            <optgroup label="北歐語言">
+              <option value="sv">瑞典文</option>
+              <option value="da">丹麥文</option>
+              <option value="no">挪威文</option>
+              <option value="fi">芬蘭文</option>
+              <option value="is">冰島文</option>
+            </optgroup>
+            <optgroup label="東歐語言">
+              <option value="ru">俄文</option>
+              <option value="pl">波蘭文</option>
+              <option value="uk">烏克蘭文</option>
+              <option value="cs">捷克文</option>
+              <option value="hu">匈牙利文</option>
+              <option value="ro">羅馬尼亞文</option>
+              <option value="bg">保加利亞文</option>
+              <option value="sr">塞爾維亞文</option>
+              <option value="hr">克羅埃西亞文</option>
+              <option value="sk">斯洛伐克文</option>
+              <option value="sl">斯洛維尼亞文</option>
+              <option value="et">愛沙尼亞文</option>
+              <option value="lv">拉脫維亞文</option>
+              <option value="lt">立陶宛文</option>
+              <option value="be">白俄羅斯文</option>
+            </optgroup>
+            <optgroup label="中東語言">
+              <option value="ar">阿拉伯文</option>
+              <option value="he">希伯來文</option>
+              <option value="fa">波斯文</option>
+              <option value="tr">土耳其文</option>
+              <option value="az">亞塞拜然文</option>
+              <option value="ka">喬治亞文</option>
+              <option value="hy">亞美尼亞文</option>
+            </optgroup>
+            <optgroup label="非洲語言">
+              <option value="am">阿姆哈拉文</option>
+              <option value="sw">斯瓦希里文</option>
+              <option value="yo">約魯巴文</option>
+              <option value="zu">祖魯文</option>
+              <option value="af">南非荷蘭文</option>
+              <option value="ha">豪薩文</option>
+              <option value="ig">伊博文</option>
+            </optgroup>
+            <optgroup label="大洋洲語言">
+              <option value="mi">毛利文</option>
+              <option value="haw">夏威夷文</option>
+              <option value="sm">薩摩亞文</option>
+              <option value="to">湯加文</option>
+            </optgroup>
+            <optgroup label="美洲語言">
+              <option value="qu">克丘亞文</option>
+              <option value="ay">艾馬拉文</option>
+              <option value="gn">瓜拉尼文</option>
+            </optgroup>
+          </select>
+        </div>
+        
+        <div class="language-switcher" id="languageSwitcher" title="切換語言">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M7.5 21L3 16.5L7.5 12L9 13.5L7.5 15H12V18H7.5L9 19.5L7.5 21M16.5 3L21 7.5L16.5 12L15 10.5L16.5 9H12V6H16.5L15 4.5L16.5 3Z"/>
+          </svg>
+        </div>
+        
+        <div class="language-selector">
+          <label for="targetLanguage">目標語言:</label>
+          <select id="targetLanguage">
+            <optgroup label="常用語言">
+              <option value="zh-TW">繁體中文</option>
+              <option value="zh-CN">簡體中文</option>
+              <option value="en" selected>英文</option>
+              <option value="ja">日文</option>
+              <option value="ko">韓文</option>
+            </optgroup>
+            <optgroup label="東亞語言">
+              <option value="ja">日文</option>
+              <option value="ko">韓文</option>
+              <option value="mn">蒙古文</option>
+            </optgroup>
+            <optgroup label="東南亞語言">
+              <option value="vi">越南文</option>
+              <option value="th">泰文</option>
+              <option value="id">印尼文</option>
+              <option value="ms">馬來文</option>
+              <option value="fil">菲律賓文</option>
+              <option value="my">緬甸文</option>
+              <option value="km">柬埔寨文</option>
+              <option value="lo">寮國文</option>
+            </optgroup>
+            <optgroup label="南亞語言">
+              <option value="hi">印地文</option>
+              <option value="bn">孟加拉文</option>
+              <option value="ta">泰米爾文</option>
+              <option value="ur">烏爾都文</option>
+              <option value="ne">尼泊爾文</option>
+              <option value="si">僧伽羅文</option>
+            </optgroup>
+            <optgroup label="西歐語言">
+              <option value="en">英文</option>
+              <option value="fr">法文</option>
+              <option value="de">德文</option>
+              <option value="es">西班牙文</option>
+              <option value="it">義大利文</option>
+              <option value="pt">葡萄牙文</option>
+              <option value="nl">荷蘭文</option>
+            </optgroup>
+            <optgroup label="北歐語言">
+              <option value="sv">瑞典文</option>
+              <option value="da">丹麥文</option>
+              <option value="no">挪威文</option>
+              <option value="fi">芬蘭文</option>
+              <option value="is">冰島文</option>
+            </optgroup>
+            <optgroup label="東歐語言">
+              <option value="ru">俄文</option>
+              <option value="pl">波蘭文</option>
+              <option value="uk">烏克蘭文</option>
+              <option value="cs">捷克文</option>
+              <option value="hu">匈牙利文</option>
+              <option value="ro">羅馬尼亞文</option>
+              <option value="bg">保加利亞文</option>
+              <option value="sr">塞爾維亞文</option>
+              <option value="hr">克羅埃西亞文</option>
+              <option value="sk">斯洛伐克文</option>
+              <option value="sl">斯洛維尼亞文</option>
+              <option value="et">愛沙尼亞文</option>
+              <option value="lv">拉脫維亞文</option>
+              <option value="lt">立陶宛文</option>
+              <option value="be">白俄羅斯文</option>
+            </optgroup>
+            <optgroup label="中東語言">
+              <option value="ar">阿拉伯文</option>
+              <option value="he">希伯來文</option>
+              <option value="fa">波斯文</option>
+              <option value="tr">土耳其文</option>
+              <option value="az">亞塞拜然文</option>
+              <option value="ka">喬治亞文</option>
+              <option value="hy">亞美尼亞文</option>
+            </optgroup>
+            <optgroup label="非洲語言">
+              <option value="am">阿姆哈拉文</option>
+              <option value="sw">斯瓦希里文</option>
+              <option value="yo">約魯巴文</option>
+              <option value="zu">祖魯文</option>
+              <option value="af">南非荷蘭文</option>
+              <option value="ha">豪薩文</option>
+              <option value="ig">伊博文</option>
+            </optgroup>
+            <optgroup label="大洋洲語言">
+              <option value="mi">毛利文</option>
+              <option value="haw">夏威夷文</option>
+              <option value="sm">薩摩亞文</option>
+              <option value="to">湯加文</option>
+            </optgroup>
+            <optgroup label="美洲語言">
+              <option value="qu">克丘亞文</option>
+              <option value="ay">艾馬拉文</option>
+              <option value="gn">瓜拉尼文</option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+      
+      <!-- 自訂片語區塊 -->
+      <div class="phrases-container" id="phrasesContainer">
+        <div class="phrases-header">
+          <h3>常用片語</h3>
+          <button id="addPhraseBtn" style="background-color: #059669; padding: 5px 10px;">新增片語</button>
+        </div>
+        <div class="phrases-list" id="phrasesList">
+          <!-- 片語項目由 JavaScript 動態加載 -->
+        </div>
+        <div class="add-phrase-form" id="addPhraseForm">
+          <input type="text" id="phraseTitle" placeholder="片語標題 (例如: 插入健保卡)">
+          <textarea id="phraseContent" placeholder="片語內容 (例如: 請插入您的健保卡到讀卡機)"></textarea>
+          <div class="add-phrase-buttons">
+            <button id="cancelAddPhrase" style="background-color: #9ca3af;">取消</button>
+            <button id="savePhrase" style="background-color: #059669;">儲存</button>
+          </div>
+        </div>
+      </div>
+      
+      <label for="inputText">輸入要翻譯的文本:</label>
+      <textarea id="inputText" placeholder="請在這裡輸入要翻譯的文本"></textarea>
+      
+      <div class="button-area">
+        <button id="translateBtn">翻譯</button>
+      </div>
+      
+      <div class="loading">
+        <div class="loading-spinner"></div>
+        <span>正在翻譯中...</span>
+      </div>
+      
+      <div class="error-message" id="error-message">
+        翻譯過程中出現錯誤，請稍後再試。
+      </div>
+      
+      <div class="result-area">
+        <h3>翻譯結果:</h3>
+        <p id="result">這裡將顯示翻譯結果</p>
+        <button id="enlargeBtn" style="background-color: #4f46e5; margin-top: 10px; padding: 5px 10px;">放大顯示</button>
+      </div>
+      
+      <div class="debug-info" id="debug-info">
+        調試信息將顯示在這裡
+      </div>
+    </div>
+
+    <div id="largeDisplay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); z-index: 100;">
+      <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%;">
+        <div id="largeText" style="color: white; font-size: 32px; max-width: 90%; text-align: center; margin-bottom: 20px;">這裡將顯示翻譯結果</div>
+        <button id="shrinkBtn" style="background-color: #e11d48; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px;">縮小</button>
+      </div>
+    </div>
+
+    <!-- 登入模態窗 -->
+    <div id="loginModal" class="modal">
+      <div class="modal-content">
+        <span class="modal-close" id="closeLoginModal">&times;</span>
+        <h2>登入</h2>
+        <button id="googleLoginBtn" style="background-color: #4285F4; display: flex; align-items: center; justify-content: center; width: 100%;">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width: 18px; height: 18px; margin-right: 10px;">
+          使用 Google 帳號登入
+        </button>
+        <p style="text-align: center; margin: 15px 0;">或</p>
+        <input type="email" id="emailInput" placeholder="電子郵件">
+        <input type="password" id="passwordInput" placeholder="密碼">
+        <button id="emailLoginBtn">使用電子郵件登入</button>
+        <p style="text-align: center; margin-top: 15px;">
+          還沒有帳號？ <a href="#" id="showSignupBtn">註冊</a>
+        </p>
+      </div>
+    </div>
+    
+    <!-- 註冊模態窗 -->
+    <div id="signupModal" class="modal">
+      <div class="modal-content">
+        <span class="modal-close" id="closeSignupModal">&times;</span>
+        <h2>註冊</h2>
+        <input type="email" id="signupEmailInput" placeholder="電子郵件">
+        <input type="password" id="signupPasswordInput" placeholder="密碼">
+        <input type="password" id="confirmPasswordInput" placeholder="確認密碼">
+        <button id="emailSignupBtn">註冊帳號</button>
+        <p style="text-align: center; margin-top: 15px;">
+          已有帳號？ <a href="#" id="showLoginBtn">登入</a>
+        </p>
+      </div>
+    </div>
+
+    <script>
+      // 調試信息函數
+      function log(message) {
+        const debugInfo = document.getElementById('debug-info');
+        const timestamp = new Date().toLocaleTimeString();
+        debugInfo.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+        console.log(message);
+      }
+      
+      // Firebase 配置
+      const firebaseConfig = {
+        apiKey: "AIzaSyBK1fDDgvY-bQ4LRjUzqQlMrL2oqzqQnYo",
+        authDomain: "webtranslate-2024.firebaseapp.com",
+        projectId: "webtranslate-2024",
+        storageBucket: "webtranslate-2024.appspot.com",
+        messagingSenderId: "764149133326",
+        appId: "1:764149133326:web:fcf6e25e37d9cb5e6f8da0"
+      };
+      
+      // 初始化 Firebase
+      firebase.initializeApp(firebaseConfig);
+      const auth = firebase.auth();
+      const db = firebase.firestore();
+      
+      // 全局變數
+      let currentUser = null;
+      
+      // 初始化頁面
+      document.addEventListener('DOMContentLoaded', function() {
+        log('頁面已加載');
+        
+        // 翻譯按鈕事件
+        document.getElementById('translateBtn').addEventListener('click', function() {
+          log('翻譯按鈕被點擊');
+          translateText();
+        });
+        
+        // 放大/縮小顯示事件
+        document.getElementById('enlargeBtn').addEventListener('click', showLarge);
+        document.getElementById('shrinkBtn').addEventListener('click', hideLarge);
+        
+        // 登入/登出按鈕事件
+        document.getElementById('loginBtn').addEventListener('click', showLoginModal);
+        document.getElementById('logoutBtn').addEventListener('click', logout);
+        
+        // 登入模態窗事件
+        document.getElementById('closeLoginModal').addEventListener('click', hideLoginModal);
+        document.getElementById('googleLoginBtn').addEventListener('click', loginWithGoogle);
+        document.getElementById('emailLoginBtn').addEventListener('click', loginWithEmail);
+        document.getElementById('showSignupBtn').addEventListener('click', showSignupModal);
+        
+        // 註冊模態窗事件
+        document.getElementById('closeSignupModal').addEventListener('click', hideSignupModal);
+        document.getElementById('emailSignupBtn').addEventListener('click', signupWithEmail);
+        document.getElementById('showLoginBtn').addEventListener('click', showLoginModal);
+        
+        // 片語功能事件
+        document.getElementById('addPhraseBtn').addEventListener('click', showAddPhraseForm);
+        document.getElementById('cancelAddPhrase').addEventListener('click', hideAddPhraseForm);
+        document.getElementById('savePhrase').addEventListener('click', savePhrase);
+        
+        // 監聽認證狀態變化
+        auth.onAuthStateChanged(function(user) {
+          if (user) {
+            // 用戶已登入
+            currentUser = user;
+            log(`用戶登入: ${user.email}`);
+            updateUIAfterLogin(user);
+            loadUserPhrases();
+          } else {
+            // 用戶未登入
+            currentUser = null;
+            log('用戶未登入');
+            updateUIAfterLogout();
+          }
+        });
+
+        // 語言切換功能
+        document.getElementById("languageSwitcher").addEventListener("click", function() {
+          const sourceSelect = document.getElementById("sourceLanguage");
+          const targetSelect = document.getElementById("targetLanguage");
+          
+          // 獲取當前選中的值
+          const sourceValue = sourceSelect.value;
+          const targetValue = targetSelect.value;
+          
+          // 如果來源語言設置為自動檢測，則不進行切換
+          if (sourceValue === "auto") {
+            alert("自動檢測語言無法切換，請先選擇特定語言");
+            return;
+          }
+          
+          // 切換語言選擇
+          for (let i = 0; i < sourceSelect.options.length; i++) {
+            if (sourceSelect.options[i].value === targetValue) {
+              sourceSelect.selectedIndex = i;
+              break;
+            }
+          }
+          
+          for (let i = 0; i < targetSelect.options.length; i++) {
+            if (targetSelect.options[i].value === sourceValue) {
+              targetSelect.selectedIndex = i;
+              break;
+            }
+          }
+        });
+      });
+      
+      // 登入相關函數
+      function showLoginModal() {
+        document.getElementById('loginModal').style.display = 'block';
+        document.getElementById('signupModal').style.display = 'none';
+      }
+      
+      function hideLoginModal() {
+        document.getElementById('loginModal').style.display = 'none';
+      }
+      
+      function showSignupModal() {
+        document.getElementById('signupModal').style.display = 'block';
+        document.getElementById('loginModal').style.display = 'none';
+      }
+      
+      function hideSignupModal() {
+        document.getElementById('signupModal').style.display = 'none';
+      }
+      
+      function loginWithGoogle() {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider)
+          .then((result) => {
+            log('Google 登入成功');
+            hideLoginModal();
+          })
+          .catch((error) => {
+            log(`Google 登入失敗: ${error.message}`);
+            alert(`登入失敗: ${error.message}`);
+          });
+      }
+      
+      function loginWithEmail() {
+        const email = document.getElementById('emailInput').value;
+        const password = document.getElementById('passwordInput').value;
+        
+        if (!email || !password) {
+          alert('請填寫電子郵件與密碼');
+          return;
+        }
+        
+        auth.signInWithEmailAndPassword(email, password)
+          .then((userCredential) => {
+            log('電子郵件登入成功');
+            hideLoginModal();
+          })
+          .catch((error) => {
+            log(`電子郵件登入失敗: ${error.message}`);
+            alert(`登入失敗: ${error.message}`);
+          });
+      }
+      
+      function signupWithEmail() {
+        const email = document.getElementById('signupEmailInput').value;
+        const password = document.getElementById('signupPasswordInput').value;
+        const confirmPassword = document.getElementById('confirmPasswordInput').value;
+        
+        if (!email || !password) {
+          alert('請填寫電子郵件與密碼');
+          return;
+        }
+        
+        if (password !== confirmPassword) {
+          alert('密碼與確認密碼不符');
+          return;
+        }
+        
+        auth.createUserWithEmailAndPassword(email, password)
+          .then((userCredential) => {
+            log('用戶註冊成功');
+            hideSignupModal();
+          })
+          .catch((error) => {
+            log(`用戶註冊失敗: ${error.message}`);
+            alert(`註冊失敗: ${error.message}`);
+          });
+      }
+      
+      function logout() {
+        auth.signOut()
+          .then(() => {
+            log('用戶登出成功');
+          })
+          .catch((error) => {
+            log(`用戶登出失敗: ${error.message}`);
+          });
+      }
+      
+      function updateUIAfterLogin(user) {
+        // 更新登入狀態 UI
+        document.getElementById('userInfo').style.display = 'block';
+        document.getElementById('userName').textContent = user.email;
+        document.getElementById('loginBtn').style.display = 'none';
+        document.getElementById('logoutBtn').style.display = 'inline-block';
+        document.getElementById('phrasesContainer').style.display = 'block';
+      }
+      
+      function updateUIAfterLogout() {
+        // 更新登出狀態 UI
+        document.getElementById('userInfo').style.display = 'none';
+        document.getElementById('userName').textContent = '未登入';
+        document.getElementById('loginBtn').style.display = 'inline-block';
+        document.getElementById('logoutBtn').style.display = 'none';
+        document.getElementById('phrasesContainer').style.display = 'none';
+        document.getElementById('phrasesList').innerHTML = '';
+      }
+      
+      // OpenRouter API 密鑰（注意：通常不應該直接放在前端代碼中）
+      const API_KEY = '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';
+      const MODEL = 'deepseek/deepseek-chat-v3-0324:free';
+      
+      // 真實翻譯函數
+      async function translateText() {
+        try {
+          log('開始翻譯流程');
+          const input = document.getElementById('inputText').value;
+          const sourceLanguage = document.getElementById('sourceLanguage').value;
+          const targetLanguage = document.getElementById('targetLanguage').value;
+          
+          log(`輸入文本: "${input}"`);
+          log(`從 ${getLanguageName(sourceLanguage)} 翻譯到 ${getLanguageName(targetLanguage)}`);
+          
+          if (!input.trim()) {
+            log('錯誤: 輸入為空');
+            alert('請先輸入要翻譯的文本');
+            return;
+          }
+          
+          // 顯示加載狀態
+          document.querySelector('.loading').style.display = 'block';
+          document.getElementById('error-message').style.display = 'none';
+          log('顯示加載動畫');
+          
+          // 使用 try-catch 結構以確保錯誤處理
+          try {
+            log('調用 OpenRouter API');
+            const translatedText = await callOpenRouterAPI(input, sourceLanguage, targetLanguage);
+            
+            log(`翻譯結果: "${translatedText}"`);
+            
+            // 更新翻譯結果顯示
+            document.getElementById('result').textContent = translatedText;
+            document.getElementById('largeText').textContent = translatedText;
+            log('更新UI完成');
+          } catch (error) {
+            log(`OpenRouter API 錯誤: ${error.message}`);
+            document.getElementById('error-message').style.display = 'block';
+            document.getElementById('error-message').textContent = `翻譯過程中出現錯誤: ${error.message}`;
+          } finally {
+            // 隱藏加載狀態
+            document.querySelector('.loading').style.display = 'none';
+            log('隱藏加載動畫');
+          }
+        } catch (error) {
+          log(`發生全局錯誤: ${error.message}`);
+          console.error('全局錯誤:', error);
+          alert('發生錯誤: ' + error.message);
+        }
+      }
+      
+      // 真正的 OpenRouter API 調用
+      async function callOpenRouterAPI(text, sourceLanguage, targetLanguage) {
+        // OpenRouter API 端點
+        const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+        
+        // 構建特定語言的翻譯提示詞
+        let systemPrompt = '你是一位專業的翻譯專家。請將以下文本進行精確翻譯，保持原文的意思、語氣和風格。只需返回翻譯結果，不要添加任何解釋或前言。';
+        let userPrompt = '';
+        
+        // 根據源語言和目標語言定制提示詞
+        if (sourceLanguage === 'auto') {
+          userPrompt = `將以下文本翻譯成${getLanguageName(targetLanguage)}：\n\n${text}`;
+        } else {
+          userPrompt = `將以下${getLanguageName(sourceLanguage)}文本翻譯成${getLanguageName(targetLanguage)}：\n\n${text}`;
+        }
+        
+        log('構建 API 請求');
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${API_KEY}`,
+              'HTTP-Referer': window.location.href,
+              'X-Title': 'Web Translation Tool'
+            },
+            body: JSON.stringify({
+              model: MODEL,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+              ],
+              temperature: 0.2, // 較低的溫度使翻譯更加準確
+              max_tokens: 1000
+            })
+          });
+          
+          log('接收到 API 響應');
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`API 錯誤: ${response.status} - ${errorData.error?.message || '未知錯誤'}`);
+          }
+          
+          const data = await response.json();
+          log('解析 API 響應數據');
+          
+          // 從回應中提取翻譯結果
+          if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+            return data.choices[0].message.content.trim();
+          } else {
+            throw new Error('API 返回的數據格式不正確');
+          }
+        } catch (error) {
+          log(`API 調用失敗: ${error.message}`);
+          throw error;
+        }
+      }
+
+      // 根據語言代碼獲取語言名稱
+      function getLanguageName(code) {
+        const languages = {
+          'auto': '自動檢測',
+          'zh-TW': '繁體中文',
+          'zh-CN': '簡體中文',
+          'en': '英文',
+          'ja': '日文',
+          'ko': '韓文',
+          'fr': '法文',
+          'de': '德文',
+          'es': '西班牙文',
+          'it': '義大利文',
+          'ru': '俄文',
+          'vi': '越南文',
+          'th': '泰文',
+          'id': '印尼文',
+          'ms': '馬來文',
+          'fil': '菲律賓文',
+          'my': '緬甸文',
+          'km': '柬埔寨文',
+          'lo': '寮國文',
+          'hi': '印地文',
+          'bn': '孟加拉文',
+          'ta': '泰米爾文',
+          'ur': '烏爾都文',
+          'ne': '尼泊爾文',
+          'si': '僧伽羅文',
+          'pt': '葡萄牙文',
+          'nl': '荷蘭文',
+          'sv': '瑞典文',
+          'da': '丹麥文',
+          'no': '挪威文',
+          'fi': '芬蘭文',
+          'is': '冰島文',
+          'pl': '波蘭文',
+          'uk': '烏克蘭文',
+          'cs': '捷克文',
+          'hu': '匈牙利文',
+          'ro': '羅馬尼亞文',
+          'bg': '保加利亞文',
+          'sr': '塞爾維亞文',
+          'hr': '克羅埃西亞文',
+          'sk': '斯洛伐克文',
+          'sl': '斯洛維尼亞文',
+          'et': '愛沙尼亞文',
+          'lv': '拉脫維亞文',
+          'lt': '立陶宛文',
+          'be': '白俄羅斯文',
+          'ar': '阿拉伯文',
+          'he': '希伯來文',
+          'fa': '波斯文',
+          'tr': '土耳其文',
+          'az': '亞塞拜然文',
+          'ka': '喬治亞文',
+          'hy': '亞美尼亞文',
+          'am': '阿姆哈拉文',
+          'sw': '斯瓦希里文',
+          'yo': '約魯巴文',
+          'zu': '祖魯文',
+          'af': '南非荷蘭文',
+          'ha': '豪薩文',
+          'ig': '伊博文',
+          'mi': '毛利文',
+          'haw': '夏威夷文',
+          'sm': '薩摩亞文',
+          'to': '湯加文',
+          'qu': '克丘亞文',
+          'ay': '艾馬拉文',
+          'gn': '瓜拉尼文',
+          'mn': '蒙古文'
+        };
+        return languages[code] || code;
+      }
+
+      // 放大顯示函數
+      function showLarge() {
+        document.getElementById('largeDisplay').style.display = 'block';
+        log('顯示大尺寸翻譯結果');
+      }
+
+      // 隱藏放大顯示函數
+      function hideLarge() {
+        document.getElementById('largeDisplay').style.display = 'none';
+        log('隱藏大尺寸翻譯結果');
+      }
+      
+      // 片語相關函數
+      function showAddPhraseForm() {
+        document.getElementById('addPhraseForm').style.display = 'block';
+      }
+      
+      function hideAddPhraseForm() {
+        document.getElementById('addPhraseForm').style.display = 'none';
+        document.getElementById('phraseTitle').value = '';
+        document.getElementById('phraseContent').value = '';
+      }
+      
+      async function savePhrase() {
+        if (!currentUser) {
+          alert('請先登入');
+          return;
+        }
+        
+        const title = document.getElementById('phraseTitle').value.trim();
+        const content = document.getElementById('phraseContent').value.trim();
+        
+        if (!title || !content) {
+          alert('請填寫片語標題和內容');
+          return;
+        }
+        
+        try {
+          // 儲存到 Firestore
+          await db.collection('users').doc(currentUser.uid).collection('phrases').add({
+            title,
+            content,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          
+          log('片語儲存成功');
+          hideAddPhraseForm();
+          loadUserPhrases();
+        } catch (error) {
+          log(`片語儲存失敗: ${error.message}`);
+          alert(`儲存失敗: ${error.message}`);
+        }
+      }
+      
+      async function loadUserPhrases() {
+        if (!currentUser) return;
+        
+        try {
+          const phrasesSnapshot = await db.collection('users').doc(currentUser.uid).collection('phrases')
+            .orderBy('createdAt', 'desc')
+            .get();
+          
+          const phrasesList = document.getElementById('phrasesList');
+          phrasesList.innerHTML = '';
+          
+          if (phrasesSnapshot.empty) {
+            phrasesList.innerHTML = '<p>尚無儲存的片語</p>';
+            return;
+          }
+          
+          phrasesSnapshot.forEach(doc => {
+            const phraseData = doc.data();
+            const phraseElement = document.createElement('div');
+            phraseElement.className = 'phrase-item';
+            phraseElement.textContent = phraseData.title;
+            phraseElement.title = phraseData.content;
+            phraseElement.addEventListener('click', () => {
+              document.getElementById('inputText').value = phraseData.content;
+              log(`使用片語: ${phraseData.title}`);
+            });
+            
+            phrasesList.appendChild(phraseElement);
+          });
+          
+          log('片語加載成功');
+        } catch (error) {
+          log(`片語加載失敗: ${error.message}`);
+        }
+      }
+    </script>
+  </body>
+</html> 
