@@ -763,39 +763,10 @@
         document.getElementById('phrasesList').innerHTML = '';
       }
       
-      // OpenRouter API 密鑰（注意：通常不應該直接放在前端代碼中）
-      let API_KEY = '';
+      // OpenRouter API 密鑰
+      // 在客戶端JavaScript中無法直接使用Cloudflare環境變數，因此改為硬編碼方式
+      const API_KEY = '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';
       const MODEL = 'deepseek/deepseek-chat-v3-0324:free';
-      
-      // 獲取 API 密鑰函數
-      function getApiKey() {
-        // 優先使用環境變數中的API密鑰
-        if (typeof OPENROUTER_API_KEY !== 'undefined' && OPENROUTER_API_KEY) {
-          log('使用環境變數中的API密鑰');
-          return OPENROUTER_API_KEY;
-        }
-        
-        // 如果已經有API_KEY，則直接返回
-        if (API_KEY) return API_KEY;
-        
-        // 檢查本地存儲是否有保存的密鑰
-        const savedKey = localStorage.getItem('openrouter_api_key');
-        if (savedKey) {
-          API_KEY = savedKey;
-          return API_KEY;
-        }
-        
-        // 如果沒有密鑰，提示用戶輸入
-        const userKey = prompt('請輸入您的 OpenRouter API 密鑰:', '');
-        if (userKey) {
-          API_KEY = userKey;
-          // 保存到本地存儲以便將來使用
-          localStorage.setItem('openrouter_api_key', userKey);
-          return API_KEY;
-        }
-        
-        throw new Error('需要 API 密鑰才能進行翻譯');
-      }
       
       // 真實翻譯函數
       async function translateText() {
@@ -868,7 +839,7 @@
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${getApiKey()}`,
+              'Authorization': `Bearer ${API_KEY}`,
               'HTTP-Referer': window.location.href,
               'X-Title': 'Web Translation Tool'
             },
