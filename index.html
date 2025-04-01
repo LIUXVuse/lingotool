@@ -764,8 +764,32 @@
       }
       
       // OpenRouter API 密鑰（注意：通常不應該直接放在前端代碼中）
-      const API_KEY = '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';
+      let API_KEY = '';
       const MODEL = 'deepseek/deepseek-chat-v3-0324:free';
+      
+      // 獲取 API 密鑰函數
+      function getApiKey() {
+        // 嘗試從環境變數獲取（適用於 Cloudflare Pages）
+        if (API_KEY) return API_KEY;
+        
+        // 檢查本地存儲是否有保存的密鑰
+        const savedKey = localStorage.getItem('openrouter_api_key');
+        if (savedKey) {
+          API_KEY = savedKey;
+          return API_KEY;
+        }
+        
+        // 如果沒有密鑰，提示用戶輸入
+        const userKey = prompt('請輸入您的 OpenRouter API 密鑰:', '');
+        if (userKey) {
+          API_KEY = userKey;
+          // 保存到本地存儲以便將來使用
+          localStorage.setItem('openrouter_api_key', userKey);
+          return API_KEY;
+        }
+        
+        throw new Error('需要 API 密鑰才能進行翻譯');
+      }
       
       // 真實翻譯函數
       async function translateText() {
@@ -821,24 +845,27 @@
         // OpenRouter API 端點
         const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
         
-        // 構建特定語言的翻譯提示詞
-        let systemPrompt = '你是一位專業的翻譯專家。請將以下文本進行精確翻譯，保持原文的意思、語氣和風格。只需返回翻譯結果，不要添加任何解釋或前言。';
-        let userPrompt = '';
-        
-        // 根據源語言和目標語言定制提示詞
-        if (sourceLanguage === 'auto') {
-          userPrompt = `將以下文本翻譯成${getLanguageName(targetLanguage)}：\n\n${text}`;
-        } else {
-          userPrompt = `將以下${getLanguageName(sourceLanguage)}文本翻譯成${getLanguageName(targetLanguage)}：\n\n${text}`;
-        }
-        
-        log('構建 API 請求');
+        // 獲取 API 密鑰
         try {
+          const apiKey = getApiKey();
+          
+          // 構建特定語言的翻譯提示詞
+          let systemPrompt = '你是一位專業的翻譯專家。請將以下文本進行精確翻譯，保持原文的意思、語氣和風格。只需返回翻譯結果，不要添加任何解釋或前言。';
+          let userPrompt = '';
+          
+          // 根據源語言和目標語言定制提示詞
+          if (sourceLanguage === 'auto') {
+            userPrompt = `將以下文本翻譯成${getLanguageName(targetLanguage)}：\n\n${text}`;
+          } else {
+            userPrompt = `將以下${getLanguageName(sourceLanguage)}文本翻譯成${getLanguageName(targetLanguage)}：\n\n${text}`;
+          }
+          
+          log('構建 API 請求');
           const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${API_KEY}`,
+              'Authorization': `Bearer ${apiKey}`,
               'HTTP-Referer': window.location.href,
               'X-Title': 'Web Translation Tool'
             },

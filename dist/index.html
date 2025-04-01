@@ -60,9 +60,30 @@
         display: flex;
         justify-content: space-between;
         margin-bottom: 20px;
+        align-items: flex-end;
       }
       .language-selector {
-        width: 48%;
+        width: 45%;
+      }
+      .language-switcher {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        background-color: #e0f2fe;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        transition: all 0.3s ease;
+      }
+      .language-switcher:hover {
+        background-color: #bae6fd;
+        transform: scale(1.1);
+      }
+      .language-switcher svg {
+        width: 24px;
+        height: 24px;
+        fill: #2563eb;
       }
       select {
         width: 100%;
@@ -333,6 +354,13 @@
             </optgroup>
           </select>
         </div>
+        
+        <div class="language-switcher" id="languageSwitcher" title="切換語言">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M7.5 21L3 16.5L7.5 12L9 13.5L7.5 15H12V18H7.5L9 19.5L7.5 21M16.5 3L21 7.5L16.5 12L15 10.5L16.5 9H12V6H16.5L15 4.5L16.5 3Z"/>
+          </svg>
+        </div>
+        
         <div class="language-selector">
           <label for="targetLanguage">目標語言:</label>
           <select id="targetLanguage">
@@ -595,6 +623,37 @@
             updateUIAfterLogout();
           }
         });
+
+        // 語言切換功能
+        document.getElementById("languageSwitcher").addEventListener("click", function() {
+          const sourceSelect = document.getElementById("sourceLanguage");
+          const targetSelect = document.getElementById("targetLanguage");
+          
+          // 獲取當前選中的值
+          const sourceValue = sourceSelect.value;
+          const targetValue = targetSelect.value;
+          
+          // 如果來源語言設置為自動檢測，則不進行切換
+          if (sourceValue === "auto") {
+            alert("自動檢測語言無法切換，請先選擇特定語言");
+            return;
+          }
+          
+          // 切換語言選擇
+          for (let i = 0; i < sourceSelect.options.length; i++) {
+            if (sourceSelect.options[i].value === targetValue) {
+              sourceSelect.selectedIndex = i;
+              break;
+            }
+          }
+          
+          for (let i = 0; i < targetSelect.options.length; i++) {
+            if (targetSelect.options[i].value === sourceValue) {
+              targetSelect.selectedIndex = i;
+              break;
+            }
+          }
+        });
       });
       
       // 登入相關函數
@@ -705,8 +764,32 @@
       }
       
       // OpenRouter API 密鑰（注意：通常不應該直接放在前端代碼中）
-      const API_KEY = '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';
+      let API_KEY = '';
       const MODEL = 'deepseek/deepseek-chat-v3-0324:free';
+      
+      // 獲取 API 密鑰函數
+      function getApiKey() {
+        // 嘗試從環境變數獲取（適用於 Cloudflare Pages）
+        if (API_KEY) return API_KEY;
+        
+        // 檢查本地存儲是否有保存的密鑰
+        const savedKey = localStorage.getItem('openrouter_api_key');
+        if (savedKey) {
+          API_KEY = savedKey;
+          return API_KEY;
+        }
+        
+        // 如果沒有密鑰，提示用戶輸入
+        const userKey = prompt('請輸入您的 OpenRouter API 密鑰:', '');
+        if (userKey) {
+          API_KEY = userKey;
+          // 保存到本地存儲以便將來使用
+          localStorage.setItem('openrouter_api_key', userKey);
+          return API_KEY;
+        }
+        
+        throw new Error('需要 API 密鑰才能進行翻譯');
+      }
       
       // 真實翻譯函數
       async function translateText() {
@@ -779,7 +862,7 @@
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${API_KEY}`,
+              'Authorization': `Bearer ${getApiKey()}`,
               'HTTP-Referer': window.location.href,
               'X-Title': 'Web Translation Tool'
             },
