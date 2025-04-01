@@ -856,8 +856,9 @@
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${API_KEY}`,
-              'HTTP-Referer': window.location.origin,
+              'Authorization': `Bearer ${API_KEY.trim()}`,
+              'HTTP-Referer': 'https://lingotool.pages.dev',
+              'Origin': 'https://lingotool.pages.dev',
               'X-Title': 'LingoTool'
             },
             body: JSON.stringify(payload)
