@@ -863,21 +863,20 @@
             body: JSON.stringify(payload)
           });
           
-          log('接收到 API 響應');
           if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`API 錯誤: ${response.status} - ${errorData.error?.message || '未知錯誤'}`);
+            const errorData = await response.json().catch(e => ({ error: { message: `無法解析錯誤響應: ${e.message}` } }));
+            log(`API響應狀態: ${response.status} ${response.statusText}`);
+            log(`API錯誤響應: ${JSON.stringify(errorData, null, 2)}`);
+            throw new Error(`API 錯誤: ${response.status} - ${errorData.error?.message || response.statusText}`);
           }
           
+          log('接收到 API 響應');
           const data = await response.json();
-          log('解析 API 響應數據');
+          log(`API返回內容: ${JSON.stringify(data, null, 2)}`);
           
-          // 從回應中提取翻譯結果
-          if (data.choices && data.choices.length > 0 && data.choices[0].message) {
-            return data.choices[0].message.content.trim();
-          } else {
-            throw new Error('API 返回的數據格式不正確');
-          }
+          // 提取翻譯結果
+          const translatedText = data.choices[0].message.content;
+          return translatedText;
         } catch (error) {
           log(`API 調用失敗: ${error.message}`);
           throw error;
