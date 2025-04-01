@@ -834,6 +834,23 @@
         }
         
         log('構建 API 請求');
+        
+        // 請求參數
+        const payload = {
+          model: MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.1, // 降低溫度使翻譯更加準確
+          max_tokens: 2000, // 增加最大令牌數
+          top_p: 0.95,
+          frequency_penalty: 0
+        };
+        
+        // 記錄詳細的請求信息，用於調試
+        log(`API 請求詳情: ${JSON.stringify(payload, null, 2)}`);
+        
         try {
           const response = await fetch(endpoint, {
             method: 'POST',
@@ -843,15 +860,7 @@
               'HTTP-Referer': window.location.origin,
               'X-Title': 'LingoTool'
             },
-            body: JSON.stringify({
-              model: MODEL,
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt }
-              ],
-              temperature: 0.2, // 較低的溫度使翻譯更加準確
-              max_tokens: 1000
-            })
+            body: JSON.stringify(payload)
           });
           
           log('接收到 API 響應');
