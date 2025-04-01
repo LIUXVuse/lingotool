@@ -840,8 +840,8 @@
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${API_KEY}`,
-              'HTTP-Referer': window.location.href,
-              'X-Title': 'Web Translation Tool'
+              'HTTP-Referer': window.location.origin,
+              'X-Title': 'LingoTool'
             },
             body: JSON.stringify({
               model: MODEL,
