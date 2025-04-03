@@ -547,7 +547,7 @@
       </div>
     </div>
 
-    <script>
+    <script type="module">
       // 調試信息函數
       function log(message) {
         const debugInfo = document.getElementById('debug-info');
@@ -557,19 +557,50 @@
       }
       
       // Firebase 配置
+      // 使用 Vite 的 import.meta.env 來讀取環境變數
+      // 確保 Cloudflare Pages 環境變數或本地 .env 文件中已正確設置 VITE_FIREBASE_... 變數
       const firebaseConfig = {
-        apiKey: "AIzaSyBK1fDDgvY-bQ4LRjUzqQlMrL2oqzqQnYo",
-        authDomain: "webtranslate-2024.firebaseapp.com",
-        projectId: "webtranslate-2024",
-        storageBucket: "webtranslate-2024.appspot.com",
-        messagingSenderId: "764149133326",
-        appId: "1:764149133326:web:fcf6e25e37d9cb5e6f8da0"
+        apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId: import.meta.env.VITE_FIREBASE_APP_ID
       };
       
-      // 初始化 Firebase
-      firebase.initializeApp(firebaseConfig);
-      const auth = firebase.auth();
-      const db = firebase.firestore();
+      // 將 auth 和 db 聲明移到外部，以便全局訪問
+      let auth = null;
+      let db = null;
+      
+      // 增強檢查：確保所有 Firebase 配置值都有效
+      const requiredConfigKeys = ['apiKey', 'authDomain', 'projectId', 'appId'];
+      let missingKeys = [];
+      for (const key of requiredConfigKeys) {
+        if (!firebaseConfig[key]) {
+          // 修正：根據 JS 物件鍵名推斷正確的環境變數名
+          const envVarName = `VITE_FIREBASE_${key.replace(/([A-Z])/g, '_$1').toUpperCase()}`;
+          missingKeys.push(envVarName);
+        }
+      }
+      
+      if (missingKeys.length > 0) {
+        const errorMsg = `Firebase 配置缺失: ${missingKeys.join(', ')}。請檢查 Cloudflare 環境變數。`;
+        console.error(errorMsg);
+        log(`錯誤: ${errorMsg}`);
+        alert("Firebase 配置錯誤，部分功能可能無法使用。請聯繫管理員。");
+      } else {
+        // 只有在所有必需配置都存在時才嘗試初始化
+        try {
+          firebase.initializeApp(firebaseConfig);
+          auth = firebase.auth(); 
+          db = firebase.firestore();
+          log("Firebase 初始化成功");
+        } catch (error) {
+          console.error("Firebase 初始化失敗:", error);
+          log(`Firebase 初始化失敗: ${error.message}`);
+          alert("無法連接到 Firebase，請稍後再試。");
+        }
+      }
       
       // 全局變數
       let currentUser = null;
@@ -579,81 +610,115 @@
         log('頁面已加載');
         
         // 翻譯按鈕事件
-        document.getElementById('translateBtn').addEventListener('click', function() {
-          log('翻譯按鈕被點擊');
-          translateText();
-        });
+        try {
+          document.getElementById('translateBtn').addEventListener('click', function() {
+            log('翻譯按鈕被點擊');
+            translateText();
+          });
+          log('翻譯按鈕事件已綁定');
+        } catch(e) { log(`綁定翻譯按鈕錯誤: ${e}`); console.error("綁定翻譯按鈕錯誤:", e); }
         
         // 放大/縮小顯示事件
-        document.getElementById('enlargeBtn').addEventListener('click', showLarge);
-        document.getElementById('shrinkBtn').addEventListener('click', hideLarge);
+        try {
+          document.getElementById('enlargeBtn').addEventListener('click', showLarge);
+          document.getElementById('shrinkBtn').addEventListener('click', hideLarge);
+          log('放大/縮小按鈕事件已綁定');
+        } catch(e) { log(`綁定放大/縮小按鈕錯誤: ${e}`); console.error("綁定放大/縮小按鈕錯誤:", e); }
         
         // 登入/登出按鈕事件
-        document.getElementById('loginBtn').addEventListener('click', showLoginModal);
-        document.getElementById('logoutBtn').addEventListener('click', logout);
+        try {
+          document.getElementById('loginBtn').addEventListener('click', showLoginModal);
+          document.getElementById('logoutBtn').addEventListener('click', logout);
+          log('登入/登出按鈕事件已綁定');
+        } catch(e) { log(`綁定登入/登出按鈕錯誤: ${e}`); console.error("綁定登入/登出按鈕錯誤:", e); }
         
         // 登入模態窗事件
-        document.getElementById('closeLoginModal').addEventListener('click', hideLoginModal);
-        document.getElementById('googleLoginBtn').addEventListener('click', loginWithGoogle);
-        document.getElementById('emailLoginBtn').addEventListener('click', loginWithEmail);
-        document.getElementById('showSignupBtn').addEventListener('click', showSignupModal);
+        try {
+          document.getElementById('closeLoginModal').addEventListener('click', hideLoginModal);
+          document.getElementById('googleLoginBtn').addEventListener('click', loginWithGoogle);
+          document.getElementById('emailLoginBtn').addEventListener('click', loginWithEmail);
+          document.getElementById('showSignupBtn').addEventListener('click', showSignupModal);
+          log('登入模態窗事件已綁定');
+        } catch(e) { log(`綁定登入模態窗錯誤: ${e}`); console.error("綁定登入模態窗錯誤:", e); }
         
         // 註冊模態窗事件
-        document.getElementById('closeSignupModal').addEventListener('click', hideSignupModal);
-        document.getElementById('emailSignupBtn').addEventListener('click', signupWithEmail);
-        document.getElementById('showLoginBtn').addEventListener('click', showLoginModal);
+        try {
+          document.getElementById('closeSignupModal').addEventListener('click', hideSignupModal);
+          document.getElementById('emailSignupBtn').addEventListener('click', signupWithEmail);
+          document.getElementById('showLoginBtn').addEventListener('click', showLoginModal);
+          log('註冊模態窗事件已綁定');
+        } catch(e) { log(`綁定註冊模態窗錯誤: ${e}`); console.error("綁定註冊模態窗錯誤:", e); }
         
         // 片語功能事件
-        document.getElementById('addPhraseBtn').addEventListener('click', showAddPhraseForm);
-        document.getElementById('cancelAddPhrase').addEventListener('click', hideAddPhraseForm);
-        document.getElementById('savePhrase').addEventListener('click', savePhrase);
+        try {
+          const addPhraseBtn = document.getElementById('addPhraseBtn');
+          const cancelAddPhrase = document.getElementById('cancelAddPhrase');
+          const savePhraseBtn = document.getElementById('savePhrase');
+          // 確保元素存在再綁定事件
+          if (addPhraseBtn) addPhraseBtn.addEventListener('click', showAddPhraseForm);
+          else log("警告: 未找到 addPhraseBtn 元素");
+          if (cancelAddPhrase) cancelAddPhrase.addEventListener('click', hideAddPhraseForm);
+          else log("警告: 未找到 cancelAddPhrase 元素");
+          if (savePhraseBtn) savePhraseBtn.addEventListener('click', savePhrase);
+          else log("警告: 未找到 savePhrase 元素");
+          log('片語功能事件已嘗試綁定');
+        } catch(e) { log(`綁定片語功能錯誤: ${e}`); console.error("綁定片語功能錯誤:", e); }
         
         // 監聽認證狀態變化
-        auth.onAuthStateChanged(function(user) {
-          if (user) {
-            // 用戶已登入
-            currentUser = user;
-            log(`用戶登入: ${user.email}`);
-            updateUIAfterLogin(user);
-            loadUserPhrases();
-          } else {
-            // 用戶未登入
-            currentUser = null;
-            log('用戶未登入');
-            updateUIAfterLogout();
-          }
-        });
+        if (auth) {
+          try {
+            log('嘗試綁定 onAuthStateChanged');
+            auth.onAuthStateChanged(function(user) {
+              if (user) {
+                currentUser = user;
+                log(`用戶登入: ${user.email}`);
+                updateUIAfterLogin(user);
+                loadUserPhrases();
+              } else {
+                currentUser = null;
+                log('用戶未登入');
+                updateUIAfterLogout();
+              }
+            });
+            log('成功綁定 onAuthStateChanged');
+          } catch (e) { log(`綁定 onAuthStateChanged 錯誤: ${e}`); console.error("綁定 onAuthStateChanged 錯誤:", e); }
+        } else {
+          log("錯誤: Firebase Auth 未成功初始化，無法監聽認證狀態。");
+        }
 
         // 語言切換功能
-        document.getElementById("languageSwitcher").addEventListener("click", function() {
-          const sourceSelect = document.getElementById("sourceLanguage");
-          const targetSelect = document.getElementById("targetLanguage");
-          
-          // 獲取當前選中的值
-          const sourceValue = sourceSelect.value;
-          const targetValue = targetSelect.value;
-          
-          // 如果來源語言設置為自動檢測，則不進行切換
-          if (sourceValue === "auto") {
-            alert("自動檢測語言無法切換，請先選擇特定語言");
-            return;
+        try {
+          const languageSwitcher = document.getElementById("languageSwitcher");
+          if (languageSwitcher) {
+            languageSwitcher.addEventListener("click", function() {
+              const sourceSelect = document.getElementById("sourceLanguage");
+              const targetSelect = document.getElementById("targetLanguage");
+              const sourceValue = sourceSelect.value;
+              const targetValue = targetSelect.value;
+              if (sourceValue === "auto") {
+                alert("自動檢測語言無法切換，請先選擇特定語言");
+                return;
+              }
+              for (let i = 0; i < sourceSelect.options.length; i++) {
+                if (sourceSelect.options[i].value === targetValue) {
+                  sourceSelect.selectedIndex = i;
+                  break;
+                }
+              }
+              for (let i = 0; i < targetSelect.options.length; i++) {
+                if (targetSelect.options[i].value === sourceValue) {
+                  targetSelect.selectedIndex = i;
+                  break;
+                }
+              }
+            });
+            log('語言切換功能事件已綁定');
+          } else {
+            log('錯誤: 未找到 languageSwitcher 元素');
           }
-          
-          // 切換語言選擇
-          for (let i = 0; i < sourceSelect.options.length; i++) {
-            if (sourceSelect.options[i].value === targetValue) {
-              sourceSelect.selectedIndex = i;
-              break;
-            }
-          }
-          
-          for (let i = 0; i < targetSelect.options.length; i++) {
-            if (targetSelect.options[i].value === sourceValue) {
-              targetSelect.selectedIndex = i;
-              break;
-            }
-          }
-        });
+        } catch(e) { log(`綁定語言切換錯誤: ${e}`); console.error("綁定語言切換錯誤:", e); }
+
+        log('DOMContentLoaded 處理程序結束');
       });
       
       // 登入相關函數
@@ -684,7 +749,9 @@
           })
           .catch((error) => {
             log(`Google 登入失敗: ${error.message}`);
-            alert(`登入失敗: ${error.message}`);
+            // 顯示更詳細的錯誤給用戶或日誌
+            console.error('Google 登入錯誤詳情:', error);
+            alert(`Google 登入失敗: ${error.code} - ${error.message}`);
           });
       }
       
@@ -730,7 +797,9 @@
           })
           .catch((error) => {
             log(`用戶註冊失敗: ${error.message}`);
-            alert(`註冊失敗: ${error.message}`);
+            // 顯示更詳細的錯誤給用戶或日誌
+            console.error('註冊錯誤詳情:', error);
+            alert(`註冊失敗: ${error.code} - ${error.message}`);
           });
       }
       

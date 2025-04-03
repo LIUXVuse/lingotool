@@ -1,17 +1,18 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { languages } from '../utils/languages';
+import { db } from '../utils/firebase';
+import { collection, addDoc, query, where, onSnapshot, doc, deleteDoc, updateDoc, getDocs } from "firebase/firestore";
 
 interface PhraseCategory {
   id: string;
   name: string;
-  phrases: Phrase[];
 }
 
 interface Phrase {
   id: string;
   text: string;
-  translations: Record<string, string>;
+  categoryId: string;
 }
 
 const Translate = () => {
@@ -25,65 +26,149 @@ const Translate = () => {
   const [charCount, setCharCount] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [phraseCategories, setPhraseCategories] = useState<PhraseCategory[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [phrases, setPhrases] = useState<Phrase[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<PhraseCategory | null>(null);
   const [languageFilter, setLanguageFilter] = useState('');
   const fullscreenRef = useRef<HTMLDivElement>(null);
 
-  const MAX_CHARS = 500; // 免費用戶字符限制
-  const MAX_CHARS_PREMIUM = 2000; // 付費用戶字符限制
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [showAddPhraseModal, setShowAddPhraseModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newPhraseText, setNewPhraseText] = useState('');
+  const [operationStatus, setOperationStatus] = useState<string | null>(null);
 
-  // 模擬從數據庫獲取片語類別
+  const MAX_CHARS = 500;
+  const MAX_CHARS_PREMIUM = 2000;
+
   useEffect(() => {
-    if (currentUser) {
-      // 在實際應用中，這裡應該調用API來獲取用戶的片語類別
-      const fetchPhrases = async () => {
-        // 模擬API調用
-        setTimeout(() => {
-          const sampleCategories: PhraseCategory[] = [
-            {
-              id: '1',
-              name: '醫護門診',
-              phrases: [
-                { id: '1', text: '請插入健保卡', translations: { '越南文': 'Vui lòng chèn thẻ bảo hiểm y tế', '英文': 'Please insert your health insurance card' } },
-                { id: '2', text: '請告訴我您的症狀', translations: { '越南文': 'Vui lòng cho tôi biết các triệu chứng của bạn', '英文': 'Please tell me your symptoms' } }
-              ]
-            },
-            {
-              id: '2',
-              name: '麻醉科',
-              phrases: [
-                { id: '3', text: '拔管後請深呼吸', translations: { '泰文': 'หลังจากถอดท่อกรุณาหายใจลึก ๆ', '英文': 'Please take deep breaths after extubation' } },
-                { id: '4', text: '您感覺疼痛嗎？', translations: { '泰文': 'คุณรู้สึกเจ็บไหม?', '英文': 'Are you feeling pain?' } }
-              ]
-            }
-          ];
-          setPhraseCategories(sampleCategories);
-        }, 500);
-      };
-      
-      fetchPhrases();
+    if (!currentUser) {
+      setPhraseCategories([]);
+      setPhrases([]);
+      setSelectedCategory(null);
+      return;
+    }
+
+    const categoriesCol = collection(db, "users", currentUser.uid, "phraseCategories");
+    const q = query(categoriesCol);
+
+    const unsubscribeCategories = onSnapshot(q, (querySnapshot) => {
+      const categoriesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhraseCategory));
+      setPhraseCategories(categoriesData);
+      console.log("Categories loaded:", categoriesData);
+      if (selectedCategory && !categoriesData.some(cat => cat.id === selectedCategory.id)) {
+          setSelectedCategory(null);
+      }
+    }, (error) => {
+      console.error("Error fetching categories:", error);
+      setOperationStatus("讀取片語類別失敗");
+    });
+
+    const phrasesCol = collection(db, "users", currentUser.uid, "phrases");
+    const qPhrases = query(phrasesCol);
+
+    const unsubscribePhrases = onSnapshot(qPhrases, (querySnapshot) => {
+        const phrasesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Phrase));
+        setPhrases(phrasesData);
+        console.log("Phrases loaded:", phrasesData);
+    }, (error) => {
+        console.error("Error fetching phrases:", error);
+        setOperationStatus("讀取片語內容失敗");
+    });
+
+    return () => {
+      unsubscribeCategories();
+      unsubscribePhrases();
     }
   }, [currentUser]);
 
-  // 處理文本輸入變化
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleAddCategory = async () => {
+    if (!currentUser || !newCategoryName.trim()) return;
+    setOperationStatus("正在儲存類別...");
+    try {
+      const categoriesCol = collection(db, "users", currentUser.uid, "phraseCategories");
+      await addDoc(categoriesCol, { name: newCategoryName.trim() });
+      setNewCategoryName('');
+      setShowAddCategoryModal(false);
+      setOperationStatus("類別已儲存！");
+      setTimeout(() => setOperationStatus(null), 2000);
+    } catch (error) {
+      console.error("Error adding category: ", error);
+      setOperationStatus("儲存類別失敗");
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (!currentUser || !window.confirm("確定要刪除此類別及其所有片語嗎？")) return;
+    setOperationStatus("正在刪除類別...");
+    try {
+      const categoryDocRef = doc(db, "users", currentUser.uid, "phraseCategories", categoryId);
+      await deleteDoc(categoryDocRef);
+
+      const phrasesCol = collection(db, "users", currentUser.uid, "phrases");
+      const q = query(phrasesCol, where("categoryId", "==", categoryId));
+      const querySnapshot = await getDocs(q);
+      const deletePromises = querySnapshot.docs.map(docSnapshot => deleteDoc(docSnapshot.ref));
+      await Promise.all(deletePromises);
+
+      setOperationStatus("類別及片語已刪除！");
+      if (selectedCategory?.id === categoryId) {
+          setSelectedCategory(null);
+      }
+      setTimeout(() => setOperationStatus(null), 2000);
+    } catch (error) {
+      console.error("Error deleting category: ", error);
+      setOperationStatus("刪除類別失敗");
+    }
+  };
+
+  const handleAddPhrase = async () => {
+    if (!currentUser || !selectedCategory || !newPhraseText.trim()) return;
+    setOperationStatus("正在儲存片語...");
+    try {
+      const phrasesCol = collection(db, "users", currentUser.uid, "phrases");
+      await addDoc(phrasesCol, {
+        text: newPhraseText.trim(),
+        categoryId: selectedCategory.id
+      });
+      setNewPhraseText('');
+      setShowAddPhraseModal(false);
+      setOperationStatus("片語已儲存！");
+      setTimeout(() => setOperationStatus(null), 2000);
+    } catch (error) {
+      console.error("Error adding phrase: ", error);
+      setOperationStatus("儲存片語失敗");
+    }
+  };
+
+  const handleDeletePhrase = async (phraseId: string) => {
+    if (!currentUser || !window.confirm("確定要刪除此片語嗎？")) return;
+    setOperationStatus("正在刪除片語...");
+    try {
+      const phraseDocRef = doc(db, "users", currentUser.uid, "phrases", phraseId);
+      await deleteDoc(phraseDocRef);
+      setOperationStatus("片語已刪除！");
+      setTimeout(() => setOperationStatus(null), 2000);
+    } catch (error) {
+      console.error("Error deleting phrase: ", error);
+      setOperationStatus("刪除片語失敗");
+    }
+  };
+
+  const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
     setInputText(text);
     setCharCount(text.length);
   };
 
-  // 交換源語言和目標語言
   const handleSwapLanguages = () => {
     setSourceLanguage(targetLanguage);
     setTargetLanguage(sourceLanguage);
-    // 如果已經有翻譯結果，也交換輸入和輸出
     if (outputText) {
       setInputText(outputText);
       setOutputText('');
     }
   };
 
-  // 處理翻譯
   const handleTranslate = async () => {
     if (!inputText.trim()) {
       setError('請輸入要翻譯的文本');
@@ -132,7 +217,6 @@ const Translate = () => {
     }
   };
 
-  // 複製翻譯結果
   const handleCopyOutput = () => {
     if (outputText) {
       navigator.clipboard.writeText(outputText)
@@ -145,69 +229,93 @@ const Translate = () => {
     }
   };
 
-  // 切換全屏顯示
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
   };
 
-  // 選擇片語
   const handleSelectPhrase = (phrase: Phrase) => {
     setInputText(phrase.text);
     setCharCount(phrase.text.length);
-    
-    // 如果該片語已有目標語言的翻譯，直接顯示
-    if (phrase.translations[targetLanguage]) {
-      setOutputText(phrase.translations[targetLanguage]);
-    } else {
-      setOutputText('');
-    }
+    setOutputText('');
   };
 
-  // 過濾顯示的語言
   const filteredLanguages = languages.filter(lang => 
     lang.toLowerCase().includes(languageFilter.toLowerCase())
   );
 
+  const filteredPhrases = selectedCategory
+    ? phrases.filter(p => p.categoryId === selectedCategory.id)
+    : [];
+
   return (
     <div className="max-w-6xl mx-auto p-4">
+      {operationStatus && (
+        <div className={`fixed top-4 right-4 p-3 rounded shadow-lg text-white ${operationStatus.includes('失敗') ? 'bg-red-500' : 'bg-green-500'}`}>
+          {operationStatus}
+        </div>
+      )}
+
       <h1 className="text-2xl font-bold mb-6 text-gray-800">翻譯工具</h1>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 左側：片語類別（僅登錄用戶可見） */}
         {currentUser && (
-          <div className="lg:col-span-1 bg-white p-4 rounded-lg shadow">
-            <h2 className="text-lg font-semibold mb-4">常用片語</h2>
-            
-            <div className="mb-4">
-              <select 
-                className="w-full p-2 border rounded"
-                value={selectedCategory || ''}
-                onChange={(e) => setSelectedCategory(e.target.value || null)}
+          <div className="lg:col-span-1 bg-white p-4 rounded-lg shadow space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold">常用片語</h2>
+              <button
+                onClick={() => setShowAddCategoryModal(true)}
+                className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
               >
-                <option value="">選擇類別</option>
-                {phraseCategories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
+                新增類別
+              </button>
             </div>
-            
+
+            <ul className="space-y-2 max-h-60 overflow-y-auto">
+               {phraseCategories.length === 0 && <p className="text-gray-500 text-sm">尚未建立任何類別</p>}
+               {phraseCategories.map(category => (
+                 <li
+                   key={category.id}
+                   className={`p-2 rounded cursor-pointer flex justify-between items-center ${selectedCategory?.id === category.id ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
+                 >
+                   <span onClick={() => setSelectedCategory(category)} className="flex-grow mr-2">{category.name}</span>
+                   <button
+                      onClick={(e) => {e.stopPropagation(); handleDeleteCategory(category.id)}}
+                      className="text-red-500 hover:text-red-700 text-xs font-bold"
+                      title="刪除類別"
+                   >
+                      X
+                   </button>
+                 </li>
+               ))}
+             </ul>
+
             {selectedCategory && (
-              <div className="space-y-2">
-                <h3 className="font-medium text-gray-700">
-                  {phraseCategories.find(c => c.id === selectedCategory)?.name}
-                </h3>
-                <ul className="space-y-2">
-                  {phraseCategories
-                    .find(c => c.id === selectedCategory)
-                    ?.phrases.map(phrase => (
-                      <li 
+              <div className="border-t pt-4 space-y-2">
+                 <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-medium text-gray-700">{selectedCategory.name}</h3>
+                    <button
+                      onClick={() => setShowAddPhraseModal(true)}
+                      className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+                    >
+                      新增片語
+                    </button>
+                  </div>
+
+                <ul className="space-y-2 max-h-60 overflow-y-auto">
+                 {filteredPhrases.length === 0 && <p className="text-gray-500 text-sm">此類別下尚無片語</p>}
+                  {filteredPhrases.map(phrase => (
+                      <li
                         key={phrase.id}
-                        onClick={() => handleSelectPhrase(phrase)}
-                        className="p-2 bg-gray-50 rounded cursor-pointer hover:bg-blue-50 transition"
+                        className="p-2 bg-gray-50 rounded hover:bg-blue-50 transition flex justify-between items-center group"
                       >
-                        {phrase.text}
+                         <span onClick={() => handleSelectPhrase(phrase)} className="cursor-pointer flex-grow mr-2">{phrase.text}</span>
+                         <button
+                            onClick={(e) => {e.stopPropagation(); handleDeletePhrase(phrase.id)}}
+                            className="text-red-400 hover:text-red-600 text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="刪除片語"
+                         >
+                           X
+                         </button>
                       </li>
                     ))}
                 </ul>
@@ -216,9 +324,7 @@ const Translate = () => {
           </div>
         )}
         
-        {/* 中間：主要翻譯區域 */}
         <div className={`${currentUser ? 'lg:col-span-2' : 'lg:col-span-3'} grid grid-cols-1 gap-4`}>
-          {/* 語言選擇區 */}
           <div className="flex flex-col sm:flex-row items-center gap-2 mb-2">
             <div className="flex-1 w-full">
               <label className="block text-sm font-medium text-gray-700 mb-1">源語言</label>
@@ -265,7 +371,6 @@ const Translate = () => {
             </div>
           </div>
           
-          {/* 輸入和輸出區域 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <div className="flex justify-between items-center mb-2">
@@ -325,7 +430,6 @@ const Translate = () => {
         </div>
       </div>
       
-      {/* 全屏顯示翻譯結果 */}
       {isFullscreen && outputText && (
         <div 
           ref={fullscreenRef}
@@ -353,6 +457,44 @@ const Translate = () => {
           </div>
         </div>
       )}
+
+      {showAddCategoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+            <h3 className="text-lg font-semibold mb-4">新增片語類別</h3>
+            <input
+              type="text"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="輸入類別名稱"
+              className="w-full p-2 border rounded mb-4"
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowAddCategoryModal(false)} className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">取消</button>
+              <button onClick={handleAddCategory} className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">儲存</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddPhraseModal && selectedCategory && (
+         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+           <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+             <h3 className="text-lg font-semibold mb-4">在 "{selectedCategory.name}" 下新增片語</h3>
+             <textarea
+               value={newPhraseText}
+               onChange={(e) => setNewPhraseText(e.target.value)}
+               placeholder="輸入片語內容"
+               rows={4}
+               className="w-full p-2 border rounded mb-4"
+             />
+             <div className="flex justify-end gap-2">
+               <button onClick={() => setShowAddPhraseModal(false)} className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">取消</button>
+               <button onClick={handleAddPhrase} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">儲存</button>
+             </div>
+           </div>
+         </div>
+       )}
     </div>
   );
 };
