@@ -761,12 +761,13 @@
         document.getElementById('logoutBtn').style.display = 'none';
         document.getElementById('phrasesContainer').style.display = 'none';
         document.getElementById('phrasesList').innerHTML = '';
+        // 可選：登出時清除本地存儲的 API Key (如果需要每次登入都重新輸入)
+        // localStorage.removeItem('openrouter_api_key');
+        // log('已清除本地存儲的 API Key');
       }
       
-      // OpenRouter API 密鑰
-      // 在客戶端JavaScript中無法直接使用Cloudflare環境變數，因此改為硬編碼方式
-      const API_KEY = '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';
-      const MODEL = 'deepseek/deepseek-chat-v3-0324:free';
+      // OpenRouter API 密鑰相關常量
+      const MODEL = 'deepseek/deepseek-chat-v3-0324:free'; // 您可以根據需要更改模型
       
       // 真實翻譯函數
       async function translateText() {
@@ -819,6 +820,15 @@
       
       // 真正的 OpenRouter API 調用
       async function callOpenRouterAPI(text, sourceLanguage, targetLanguage) {
+        let apiKey;
+        try {
+          apiKey = getApiKey(); // 從 localStorage 獲取或提示輸入
+        } catch (error) {
+          document.getElementById('error-message').style.display = 'block';
+          document.getElementById('error-message').textContent = `獲取 API Key 時出錯: ${error.message}`;
+          throw error; // 停止執行
+        }
+
         // OpenRouter API 端點
         const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
         
@@ -856,9 +866,9 @@
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${API_KEY.trim()}`,
-              'HTTP-Referer': 'https://lingotool.pages.dev',
-              'Origin': 'https://lingotool.pages.dev',
+              'Authorization': `Bearer ${apiKey}`, // 使用從 localStorage 或提示獲取的 Key
+              //'HTTP-Referer': 'https://lingotool.pages.dev', // 本地測試時暫時註解掉
+              //'Origin': 'https://lingotool.pages.dev',     // 本地測試時暫時註解掉
               'X-Title': 'LingoTool'
             },
             body: JSON.stringify(payload)
@@ -1046,6 +1056,25 @@
           log('片語加載成功');
         } catch (error) {
           log(`片語加載失敗: ${error.message}`);
+        }
+      }
+
+      // Helper function to get API Key
+      function getApiKey() {
+        let apiKey = localStorage.getItem('openrouter_api_key');
+        if (!apiKey) {
+          apiKey = prompt('請輸入您的 OpenRouter API Key:');
+          if (apiKey && apiKey.trim() !== '') {
+            localStorage.setItem('openrouter_api_key', apiKey.trim());
+            log('API Key 已儲存到本地存儲');
+            return apiKey.trim();
+          } else {
+            log('錯誤: 未提供 API Key');
+            throw new Error('未提供 OpenRouter API Key');
+          }
+        } else {
+          log('從本地存儲加載 API Key');
+          return apiKey;
         }
       }
     </script>
