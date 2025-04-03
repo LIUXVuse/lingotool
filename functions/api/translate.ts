@@ -1,5 +1,7 @@
+/// <reference types="@cloudflare/workers-types" />
+
 interface Env {
-  OPENROUTER_API_KEY: string;
+  DEEPSEEK_API_KEY: string;
 }
 
 interface TranslateRequest {
@@ -9,7 +11,7 @@ interface TranslateRequest {
   userId?: string;
 }
 
-interface OpenRouterResponse {
+interface DeepSeekResponse {
   choices: {
     message: {
       content: string;
@@ -52,56 +54,71 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // 記錄請求開始時間（用於計算響應時間）
     const startTime = Date.now();
 
-    // 構建 OpenRouter API 請求
-    const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
-    const prompt = `請將以下${sourceLanguage}文本翻譯成${targetLanguage}，只返回翻譯結果，不要添加任何解釋或備註:
-    "${text}"`;
+    // 更新為 DeepSeek API endpoint
+    const deepSeekUrl = 'https://api.deepseek.com/chat/completions';
+    
+    // 可以簡化 Prompt，讓模型專注翻譯
+    const system_prompt = `你是一個專業、精通 ${sourceLanguage} 和 ${targetLanguage} 的翻譯引擎。請將我提供的 ${sourceLanguage} 文本準確翻譯成 ${targetLanguage}。不要輸出任何與翻譯結果無關的內容，例如解釋、評論或標題。直接輸出翻譯後的文本。`;
+    const user_prompt = `${text}`; // 直接給文本
 
-    const openRouterRequestBody = {
-      model: 'deepseek/deepseek-chat-v3-0324:free', // 使用免費版 DeepSeek 模型
+    const deepSeekRequestBody = {
+      model: 'deepseek-chat', // 使用 DeepSeek 的標準聊天模型
       messages: [
         {
+          role: 'system',
+          content: system_prompt,
+        },
+        {
           role: 'user',
-          content: prompt,
+          content: user_prompt,
         },
       ],
-      temperature: 0.3, // 降低溫度以獲得更確定的翻譯
-      max_tokens: 1000, // 調整以適應翻譯需求
+      temperature: 0.1, // 保持較低溫度以獲得穩定翻譯
+      max_tokens: 2000, // 根據需要調整
+      stream: false // 確保一次性返回結果
     };
 
-    // 發送請求到 OpenRouter API
-    const openRouterResponse = await fetch(openRouterUrl, {
+    // 發送請求到 DeepSeek API
+    const deepSeekResponse = await fetch(deepSeekUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${context.env.OPENROUTER_API_KEY}`,
-        'HTTP-Referer': 'https://webtranslate.pages.dev', // 添加應用網址作為來源引用
-        'X-Title': 'Web Translate App', // 應用名稱
+        // 使用 DEEPSEEK_API_KEY
+        'Authorization': `Bearer ${context.env.DEEPSEEK_API_KEY}`,
+        // 移除 OpenRouter 特定標頭
       },
-      body: JSON.stringify(openRouterRequestBody),
+      body: JSON.stringify(deepSeekRequestBody),
     });
 
-    // 處理 OpenRouter API 響應
-    if (!openRouterResponse.ok) {
-      const errorData = await openRouterResponse.text();
-      console.error('OpenRouter API Error:', errorData);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: `OpenRouter API 錯誤: ${openRouterResponse.status} ${openRouterResponse.statusText}`,
-        }),
-        {
-          status: openRouterResponse.status,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+    // 處理 DeepSeek API 響應
+    if (!deepSeekResponse.ok) {
+      const errorData = await deepSeekResponse.text();
+      console.error('DeepSeek API Error Response Body:', errorData);
+      try {
+        const parsedError = JSON.parse(errorData);
+        console.error('Parsed DeepSeek API Error:', parsedError);
+         return new Response(
+            JSON.stringify({
+            success: false,
+            error: `DeepSeek API 錯誤: ${deepSeekResponse.status} - ${parsedError?.error?.message || deepSeekResponse.statusText}`,
+            }),
+            { status: deepSeekResponse.status, headers: { 'Content-Type': 'application/json' } }
+        );
+      } catch (e) {
+         // 如果錯誤響應不是 JSON
+         return new Response(
+            JSON.stringify({
+            success: false,
+            error: `DeepSeek API 錯誤: ${deepSeekResponse.status} ${deepSeekResponse.statusText} - ${errorData}`,
+            }),
+            { status: deepSeekResponse.status, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
-    // 解析 OpenRouter API 響應
-    const responseData: OpenRouterResponse = await openRouterResponse.json();
-    const translation = responseData.choices[0]?.message?.content.trim() || '翻譯失敗';
+    // 解析 DeepSeek API 響應
+    const responseData: DeepSeekResponse = await deepSeekResponse.json();
+    const translation = responseData.choices[0]?.message?.content.trim() || '翻譯失敗或無返回內容';
     const responseTime = Date.now() - startTime;
 
     // 構建成功響應
@@ -125,12 +142,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
     );
   } catch (error) {
-    console.error('Translation API Error:', error);
+    console.error('Translation Function Error:', error);
     
     return new Response(
       JSON.stringify({
         success: false,
-        error: `處理請求時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`,
+        error: `處理請求時發生內部錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`,
       }),
       {
         status: 500,
