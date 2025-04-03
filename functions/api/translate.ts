@@ -80,6 +80,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       stream: false // 確保一次性返回結果
     };
 
+    // --- 添加詳細日誌 --- 
+    const apiKeyExists = !!context.env.DEEPSEEK_API_KEY;
+    console.log(`[Translate Function] 發送請求到: ${deepSeekUrl}`);
+    console.log(`[Translate Function] 使用模型: ${deepSeekRequestBody.model}`);
+    console.log(`[Translate Function] DEEPSEEK_API_KEY 是否存在: ${apiKeyExists}`);
+    // 為了安全，不要打印完整的 API Key
+    // console.log(`[Translate Function] Key prefix: ${context.env.DEEPSEEK_API_KEY?.substring(0, 5)}...`);
+
     // 發送請求到 DeepSeek API
     const deepSeekResponse = await fetch(deepSeekUrl, {
       method: 'POST',
@@ -91,6 +99,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       },
       body: JSON.stringify(deepSeekRequestBody),
     });
+
+    console.log(`[Translate Function] DeepSeek API 響應狀態: ${deepSeekResponse.status}`);
 
     // 處理 DeepSeek API 響應
     if (!deepSeekResponse.ok) {
@@ -144,7 +154,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
     );
   } catch (error) {
-    console.error('Translation Function Error:', error);
+    console.error('[Translate Function] 內部錯誤:', error);
     
     return new Response(
       JSON.stringify({

@@ -210,6 +210,7 @@ const Translate = () => {
 
     setIsTranslating(true);
     setError(null);
+    console.log("調用後端翻譯 API (/api/translate)...");
 
     try {
       const response = await fetch('/api/translate', {
@@ -225,19 +226,17 @@ const Translate = () => {
         }),
       });
 
-      // 為 data 指定類型
       const data: ApiResponse = await response.json();
 
       if (!response.ok || !data.success) {
-        // 現在可以安全地訪問 data.error
+        console.error("後端 /api/translate 返回錯誤:", data);
         throw new Error(data.error || `翻譯請求失敗，狀態碼: ${response.status}`);
       }
 
-      // 現在可以安全地訪問 data.translation
-      setOutputText(data.translation || '翻譯結果為空'); // 添加一個空結果的處理
+      setOutputText(data.translation || '翻譯結果為空');
     } catch (err) {
-      console.error("翻譯過程中發生錯誤:", err);
-      setError((err as Error).message || '翻譯過程中發生錯誤');
+      console.error("調用 /api/translate 或處理響應時發生錯誤:", err);
+      setError((err as Error).message || '調用翻譯 API 時發生錯誤');
     } finally {
       setIsTranslating(false);
     }
