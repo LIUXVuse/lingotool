@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+// 添加一個無意義的註解來嘗試觸發更新 v1.0
+
 interface Env {
   DEEPSEEK_API_KEY: string;
 }
