@@ -6,8 +6,8 @@
     "build": "tsc -p tsconfig.functions.json && vite build",
     "preview": "vite preview",
     "start": "vite",
-    "deploy": "npm run build && wrangler pages deploy dist --functions-output-dir=./functions-dist",
-    "cf:deploy": "npm run build && wrangler pages publish dist --project-name webtranslate --functions-output-dir=./functions-dist"
+    "deploy": "npm run build && wrangler pages deploy dist",
+    "cf:deploy": "npm run build && wrangler pages publish dist --project-name webtranslate"
   },
   "dependencies": {
     "firebase": "^9.22.0",
@@ -17,8 +17,8 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250403.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.8.2",
     "vite": "^5.2.4",
-    "wrangler": "^3.15.0",
-    "typescript": "^5.0.0"
+    "wrangler": "^3.15.0"
   }
 }

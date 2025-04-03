@@ -8,8 +8,9 @@
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "outDir": "./functions-dist",
+    "outDir": "./functions",
     "rootDir": "./functions",
+    "sourceMap": true,
     "types": ["@cloudflare/workers-types"]
   },
   "include": ["functions/**/*.ts"],
